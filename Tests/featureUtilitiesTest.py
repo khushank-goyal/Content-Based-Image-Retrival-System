@@ -9,8 +9,7 @@ from sklearn import preprocessing
 import sys
 import os
 import re
-import cv2
-import matplotlib.pyplot as plt
+
 
 def getAndSplitImage(idString):
     # Read corresponding image.
@@ -27,20 +26,7 @@ def getAndSplitImage(idString):
         splitImage8x8 += temp
 
     return image, splitImage8x8
-def SplitImage(image):
-    
 
-    # Split horizontally 8 sections.
-    splitImageHorizontal = np.array_split(image,8,axis=0)
-    splitImage8x8 = []
-
-    # Split vertically 8 sections to make 8x8
-    for array in splitImageHorizontal:
-        temp = np.array_split(array,8,axis=1)
-        
-        splitImage8x8 += temp
-
-    return splitImage8x8
 def getAndSplitImageFromFile(path):
     # Read corresponding image.
     image = imread(path, as_gray=True)
@@ -78,34 +64,25 @@ def testSplit(splitImage8x8):
 
 def calculateColorMoments(splitImage8x8):
     # Create empty array of size 64x3
-    #momentsArray = np.empty([64,3]).astype(float)
-    means = []
-    stds = []
-    skews = []
+    momentsArray = np.empty([64,3]).astype(float)
 
     # Add moments for tiles row by row
     tileNumber = 0
     for tile in splitImage8x8:
         
         # Calculate mean (average).
-        means.append(np.mean(tile))
-        #momentsArray[tileNumber, 0] = np.mean(tile)
+        momentsArray[tileNumber, 0] = np.mean(tile)
 
         # Calculate standard deviation (sqrt of average of squared differences from the mean) (measure of data spread)
-        #momentsArray[tileNumber, 1] = np.std(tile)
-        stds.append(np.std(tile))
+        momentsArray[tileNumber, 1] = np.std(tile)
 
         # Calculate skewness (asymetry of data distribution) (Fisher-Pearson used) (Alternate Simple calc mean-mode/sdev or 3(mean-median)/sdev)
         # (cube root of average of cubed differences from the mean)
-        #momentsArray[tileNumber, 2] = skew(tile, axis=None)
-        skews.append(skew(tile, axis=None))
+        momentsArray[tileNumber, 2] = skew(tile, axis=None)
 
         tileNumber += 1
 
-    stds.extend(skews)
-    means.extend(stds)
-
-    return means
+    return momentsArray
 
 def momentsToHTML(momentsArray):
     dataFrame = pd.DataFrame(momentsArray, columns = ['Mean','SDEV','Skewness'])
@@ -567,10 +544,12 @@ def task_one_prompts():
     print("Please enter desired k value: ")
     kValue = int(input())
 
-    print("Please enter desired  dimensionality reduction techniques\n(, SVD, LDA, k-means): ")
+    print("Please enter desired  dimensionality reduction techniques\n(PCA, SVD, LDA, k-means): ")
     drTechnique = input()
 
     return modelName, XType, kValue, drTechnique
+
+
 
 
 def get_X_type_dir_list(XType, folderName = 'database'):
@@ -591,7 +570,7 @@ def get_X_type_dir_list(XType, folderName = 'database'):
 def get_Y_type_dir_list(YType, folderName = 'database'):
 
     directoryList = []
-    YType = "-"+str(YType)+"-"
+    YType = "-"+YType+"-"
 
     # Add all matching file paths under directory to list. 
     for path in os.listdir(folderName):
@@ -603,57 +582,11 @@ def get_Y_type_dir_list(YType, folderName = 'database'):
 
     return directoryList
 
-def writeToFile(vectors,file_name):
-    np.savetxt(file_name,vectors,delimiter=',')
 
-def readFromFile(file_name):
-    with open(file_name) as file:
-        newVectors = [[complex(digit) for digit in line.split(',')] for line in file]
+def get_HOG_array(Xtype):
 
-    return newVectors
+    directoryList = get_X_type_dir_list(Xtype)
 
-def get_New_Image(folderName,imageName):
-   
-    # Get new image.
-    baseImagePath = f'{folderName}/{imageName}'
-    baseImage = imread(baseImagePath, as_gray=True)
-
-    return baseImage
-
-def displayImages(images):
-    '''
-    images: 2D array of all of the images from the provided folder
-
-    values: Indexes of the images that should be displayed
-
-    Functionality: Displays the images vertically by similarity score with a higher
-        similarity at the top. 
-    '''
-    if (len(images))==1:
-        plt.imshow(images[0])
-
-    else:
-        _,imageDisplay = plt.subplots(len(images),1)
-
-        for index in range(len(images)):
-            imageDisplay[index].imshow(images[index],cmap='gray')
-
-    plt.show()
-
-def get_CM_array(directoryList):
-    featuresList = []
-
-    # Calculate CM for each image in list, add to featuresList.
-    for path in directoryList:
-
-        image = imread(path, as_gray=True)
-        imageCM = calculateColorMoments(image)
-
-        featuresList.append(imageCM)
-    # Return as array.
-    return np.array(featuresList)
-
-def get_HOG_array(directoryList):
     featuresList = []
 
     # Calculate HOG for each image in list, add to featuresList.
@@ -667,7 +600,9 @@ def get_HOG_array(directoryList):
     return np.array(featuresList)
 
 
-def get_ELBP_array(directoryList):
+def get_ELBP_array(Xtype):
+
+    directoryList = get_X_type_dir_list(Xtype)
 
     featuresList = []
     # Calculate ELBP for each image in list, add to featuresList, return as array.
@@ -681,33 +616,27 @@ def get_ELBP_array(directoryList):
     return np.array(featuresList)
 
 
-# X_or_Y = 0 for X and  X_or_Y = 1 for Y
-def get_feature_array(feature_model_name,type_name,X_or_Y):
-    #directoryList = []
-    if X_or_Y == 0:
-        directoryList = get_X_type_dir_list(type_name)
-    elif X_or_Y == 1:
-        directoryList = get_Y_type_dir_list(type_name)
+def build_C_matrix(modelName, XType):
 
-    if(feature_model_name == 'CM'):
+    # featureArray will be nparray containing features row-wise.
+    featureArray = None
+
+    directoryList = get_X_type_dir_list(XType)
+
+    if(modelName == 'CM'):
         # Color Moments
-        featureArray = get_CM_array(directoryList)
-    if(feature_model_name == 'ELBP'):
+        pass
+    if(modelName == 'ELBP'):
         # ELBP
-        featureArray = get_ELBP_array(directoryList)
-    if(feature_model_name == 'HOG'):
+        featureArray = get_ELBP_array(XType)
+    if(modelName == 'HOG'):
         # HOG
-        featureArray = get_HOG_array(directoryList)
+        featureArray = get_HOG_array(XType)
 
-    return featureArray
+    # Generate covariance-variance matrix.
+    cMatrix = np.covMatrix = np.cov(featureArray,bias=False)
 
-
-
-def build_C_matrix(featureArray):
-
-    cMatrix = np.cov(np.array(featureArray).T)
-
-    return cMatrix   
+    return cMatrix
 
 
 def eigen_decomp(matrix):
@@ -718,421 +647,55 @@ def eigen_decomp(matrix):
     return eigValues, eigVectors
 
 def extract_K_values(eigValues, eigVectors, kValue):
+    
     valueIndexList = []
     
-
-    for index,value in enumerate(eigValues):
-        valueIndexList.append((index,value))
+    # Log values and indexes.
+    index = 0
+    for value in eigValues:
+        valueIndexList.append((index, value)) 
+        index+=1
     
     # Sort to find contribution.
     valueIndexList.sort(key = lambda x: x[1], reverse=True)
 
 
+    highestIndexList = []
 
+    # Grab k highest indexes.
+    indexSelect = 0
+    for index in range(kValue):
+        highestIndexList.append(valueIndexList[indexSelect][0])
+        indexSelect +=1
+    
+    highestIndexList.sort()
 
+    # Convert to dataframe and select columns.
+    df_eigVectors = pd.DataFrame(eigVectors)
+    df_eigValues = pd.DataFrame(eigValues)
 
-    k_highest_vectors = []
-
-    for index,_ in valueIndexList:
-        if index < kValue:
-            k_highest_vectors.append(eigVectors[index])
-
-    #k_highest_vectors = df_eigVectors.loc[:, highestIndexList]#[0:kValue]
-    k_highest_values = [value for index,value in valueIndexList][0:kValue]
+    k_highest_vectors = df_eigVectors.loc[:, highestIndexList]
+    k_highest_values = df_eigValues.loc[highestIndexList]
 
 
     return k_highest_values, k_highest_vectors
     
 
 
-def generate_data_for_PCA(modelName, type_name, X_or_Y):
-
-    featureArray = get_feature_array(modelName,type_name,X_or_Y)
-
-    return featureArray
-
-def generate_data_and_perform_PCA(modelName, type_name, X_or_Y, kValue):
-    featureArray = generate_data_for_PCA(modelName, type_name, X_or_Y)
-    return PCA(featureArray,kValue)
 
 
-def PCA(featureArray, kValue):
-    '''
-    featureArray: original data matrix
-    kValue: k latent semantics
-    orig_x_dimension: just put len of a row for a similarity matrix, otherwise it would be dertemined when generating the feature data
-    orig_y_dimension: just put len of the similarity matrix, otherwise it would be dertemined when generating the feature data
 
-    '''
+    
+
+def PCA(modelName, XType, kValue):
 
     # Generate covariance matrix.
-    cMatrix = build_C_matrix(featureArray)
-    
+    cMatrix = build_C_matrix(modelName, XType)
 
     # Perform eigendecomposition. 
     eigValues, eigVectors = eigen_decomp(cMatrix)
 
-   
-
-    inverse_eigen = np.array(eigVectors).T
-
-
-
-    #print(len(eigVectors),len(eigVectors[0]))
-    #Need to figure out how to cut down the rows and columns to be equal number
-
-    if kValue > len(cMatrix):
-    	kValue = len(cMatrix)
-
-
     # Pick top k values and vectors. 
-    #k_highest_values, k_highest_vectors = extract_K_values(eigValues, eigVectors, kValue)
+    k_highest_values, k_highest_vectors = extract_K_values(eigValues, eigVectors, kValue)
 
-    k_highest_values, k_highest_inverse_vectors = extract_K_values(eigValues, inverse_eigen, kValue)
-
-
-    return k_highest_values, k_highest_inverse_vectors
-
-
-def generate_data_and_perform_SVD(modelName, XType, X_or_Y, kValue):
-    featureArray = get_feature_array(modelName, XType, X_or_Y)
-    return SVD(featureArray,kValue)
-
-
-def SVD(featureArray, kValue):
-
-
-    if len(featureArray[0])<kValue:
-        kValue = len(featureArray[0])
-    
-    u, s, v = SVDHelper(featureArray)
-    #u, s, v = np.linalg.svd(featureArray)
-    
-
-    k_highest_values, k_highest_vectors = extract_K_values(s,u,kValue)
-
-    _, k_highest_right_vectors = extract_K_values(s,v,kValue)
-   
-
-    return k_highest_values, k_highest_right_vectors
-
-
-def SVDHelper(a):
-    aTranspose1 = a @ np.transpose(a) 
-    S, U = eigen_decomp(aTranspose1)
-    aTranspose2 = np.transpose(a) @ a
-    eigenValues, V = eigen_decomp(aTranspose2)
-    V = np.transpose(V)
-    S = np.sqrt(S)
-
-    #returns U, S, V where S is the eigenValues and U and V are eigenvectors 
-    return U, S, V
-    
-
-
-
-################################
-#For task 1 or 2
-
-################################################################################################ 
-def get_Features_based_on_Type_or_Subject(feature_model_name,X_or_Y):
-	types = ['cc', 'rot', 'neg', 'poster', 'noise01', 'original', 'emboss', 'smooth', 'noise02', 'stipple', 'con', 'jitter']
-	subjects = [x for x in range(1,41)]
-	grouping_vectors = []
-
-	if X_or_Y == 0:
-		for t in types:
-			feature_array = get_feature_array(feature_model_name,t,X_or_Y)
-
-
-			#Using Average for Now
-
-			type_vector = []
-			for j in range(len(feature_array[0])):
-				avg = 0
-				for row in feature_array:
-					avg+=row[j]
-
-				avg = avg/(len(feature_array))
-				type_vector.append(avg)
-
-			grouping_vectors.append(type_vector)
-
-	elif X_or_Y == 1:
-		for t in subjects:
-			#print(t)
-			feature_array = get_feature_array(feature_model_name,t,X_or_Y)
-			#print(len(feature_array))
-			#print(len(featureArray[0]))
-
-			#Using Average for Now
-
-			type_vector = []
-			for j in range(len(feature_array[0])):
-				avg = 0
-				for row in feature_array:
-					avg+=row[j]
-
-				avg = avg/(len(feature_array))
-				type_vector.append(avg)
-
-			grouping_vectors.append(type_vector)
-			
-
-	return grouping_vectors
-
-def write_weight_pairs(new_projected_data, fileName, x_or_y):
-    types = ['cc', 'rot', 'neg', 'poster', 'noise01', 'original', 'emboss', 'smooth', 'noise02', 'stipple', 'con', 'jitter']
-    subjects = [x for x in range(1,41)]
-    f = open(fileName, 'w')
-  # python will convert \n to os.linesep
-
-    for i in range(len(new_projected_data[0])):
-        values = [(row[i],index+1) for index,row in enumerate(new_projected_data)]
-        #print(values)
-
-        values.sort(key = lambda x: x[0], reverse=True)
-
-        f.write(f'\n\nlatent_semantics {i+1}\n')
-
-        if x_or_y == 0:
-            for value in values:
-                f.write(f'{types[value[1]]}, {value[0]}\n')
-        else:
-            for value in values:
-                f.write(f'{value[1]}, {value[0]}\n')
-
-    f.close()
-
-
-
-
-def project_data(right_feature_matrix, grouping_vectors):
-	new_projected_data = np.matmul(grouping_vectors, np.array(right_feature_matrix).T)
-	return new_projected_data
-
-#Task 1 and 2 call this
-def get_Subject_or_Type_Weight_Pairs(feature_model, type_name, k, dimensional_reduction_technique, X_or_Y=0):
-    '''
-    feature_model = CM, HOG, ELBP
-    type_name = X (cc,con...) or Y (1,2..)
-    k = k latent semantics
-    dimensional_reduction_technique = PCA or SVD
-    X_or_Y = 0 if is an X value or 1 if it is a Y value
-    '''
-
-    # all latent semantic files can be stored in the latent_semantics_folder
-    latent_semantics_folder = 'latent_semantic_files/'
-
-    eigen_vectors = []
-    right_feature_matrix = []
-
-    if dimensional_reduction_technique == 'PCA':
-        _,right_feature_matrix = generate_data_and_perform_PCA(feature_model,type_name,X_or_Y,k)
-    elif dimensional_reduction_technique == 'SVD':
-        _,right_feature_matrix = generate_data_and_perform_SVD(feature_model,type_name,X_or_Y,k)
-
-
-    ####################################################################################
-    opposite = 0
-    if (X_or_Y == 0):
-        opposite = 1
-
-
-    grouping_vectors = get_Features_based_on_Type_or_Subject(feature_model, opposite)
-
-    p_data = project_data(right_feature_matrix,grouping_vectors)
-
-    ####################################################################################
-    #print(len(p_data),len(p_data[0]))
-
-    fileName = f'latent_semantics_{dimensional_reduction_technique}_{feature_model}_{type_name}_{k}.txt'
-
-    fileName2 = f'rlatent_semantics_{dimensional_reduction_technique}_{feature_model}_{type_name}_{k}.txt'
-
-    filepath = f'{latent_semantics_folder}{fileName}'
-
-    filepath2 = f'{latent_semantics_folder}{fileName2}'
-
-    write_weight_pairs(p_data,filepath,opposite)
-    #writeToFile(p_data,filepath)
-    writeToFile(right_feature_matrix,filepath2)
-
-    print(f'latent semantics stored at: {filepath}')
-
-
-######################################
-#For task 5
-# Definiton: Loads all the images from a folder
-# folder = folder to get images from
-def load_images_from_folder(folder):
-    images = []
-    for filename in os.listdir(folder):
-        img = cv2.imread(os.path.join(folder,filename))
-        b, g, r = cv2.split(img)
-        if img is not None:
-            images.append(b)
-    return images
-
-# Definiton: Loads all the image names from a folder
-# folder = folder to get image names from
-def load_image_names_from_folder(folder):
-    imageNames = []
-    for filename in os.listdir(folder):
-        imageNames.append(filename)
-    return imageNames
-
-
-# Definiton: Returns the feature for a given image based on the featureType given
-# featureType = HOG, CM or ELBP
-# iamge = image to get features from
-def getImageFeature(featureType, image):
-
-    if featureType == "HOG":
-        new_image, _ = calculateHOG(image)
-    elif featureType == "CM":
-        new_image = calculateColorMoments(SplitImage(image))
-    elif featureType == "ELBP":
-        new_image, _= calculateELBP(image)
-    return new_image
-
-# Runs through all images in database and returns the similarity score between the given image similarity and all the images in the database
-# Inputs:
-# allImages = All the images in the database
-# baseSimilarity = similarity score for given image in task 5
-# featureType = feature type
-# semantic_data = semantic data from given file
-
-def get_Image_Latent_Semantic_Similarity(allImages,baseSimilarity,featureType, semantic_data):
-    dataBaseSimilarities = []
-    index = 0
-    for image in allImages:
-        imageFeature = getImageFeature(featureType, image)
-        imageSimilarity = np.dot([imageFeature],np.transpose(semantic_data) )
-        
-        dataBaseSimilarities.append( (index,np.linalg.norm(baseSimilarity-imageSimilarity)))
-        index += 1
-    return dataBaseSimilarities
-
-
-#
-# folderName = name of folder that given image is located
-# iamgeName = name of image file for given query image
-# fileName = name of latent semantic file located in latent_semantic_files folder
-# n = number of most similar images to return
-#
-
-#Task 5
-def get_n_Most_Similar_Images(folderName,imageName, fileName, n):
-    #get image given image
-    new_image = get_New_Image(folderName,imageName)
-
- 
-    latent_semantics_folder = 'latent_semantic_files/'
-    filepath = f'{latent_semantics_folder}r{fileName}'
-
-    #get given latent semantic file name
-    semantic_data = readFromFile(filepath)
-    allImageNames = load_image_names_from_folder("database")
-    allImages = load_images_from_folder("database")
-
-    #split latent semantic file based on name to get information about file
-    latentSemanticsName = fileName.split("_")
-    dimesionalityReductionTechnique = latentSemanticsName[2]
-    featureType = latentSemanticsName[3]
-
-    #get the features of given image based on the latent semantic file feature type
-    new_image = getImageFeature(featureType, new_image)
-
-    
-    baseSimilarity = np.dot([new_image],np.transpose(semantic_data))
-
-    dataBaseSimilarities = get_Image_Latent_Semantic_Similarity(allImages, baseSimilarity,featureType, semantic_data)
-
-    
-    dataBaseSimilarities.sort(key = lambda x: x[1], reverse=False)
-    outputImages = []
-    outputNames = []
-    for inc in range(n):
-        outputImages.append(allImages[dataBaseSimilarities[inc][0]])
-        outputNames.append(allImageNames[dataBaseSimilarities[inc][0]])
-    print(outputNames)
-    displayImages(outputImages)
-
-#def get_Most_Similar_Image_Type()
-
-
-######################################
-#For task 6
-
-# Definition: Runs through types in featureType and returns the similarity score between the given image similarity that type
-# Inputs:
-# typeFeatures = calculated features for each type in database
-# baseSimilarity = similarity score for given image in task 6 
-# featureType = feature type
-# semantic_data = semantic data from given file
-def get_Type_Latent_Semantic_Similarity(typeFeatures,baseSimilarity,featureType, semantic_data):
-    dataBaseSimilarities = []
-    index = 0
-    for type in typeFeatures:
-        
-        imageSimilarity = np.dot([type],np.transpose(semantic_data) )
-        
-        dataBaseSimilarities.append( (index,np.linalg.norm(baseSimilarity-imageSimilarity)))
-        index += 1
-    return dataBaseSimilarities
-
-
-#
-# folderName = name of folder that given image is located
-# iamgeName = name of image file for given query image
-# fileName = name of latent semantic file located in latent_semantic_files folder
-# x_or_y = whether it is type of image for task 6(0) or subject of image for task 7(1)
-# 
-def get_type_or_subject_of_image(folderName,imageName, fileName, x_or_y):
-    types = ['cc', 'rot', 'neg', 'poster', 'noise01', 'original', 'emboss', 'smooth', 'noise02', 'stipple', 'con', 'jitter']
-    subjects = [x for x in range(1,41)]
-    #get image given image
-    new_image = get_New_Image(folderName,imageName)
-
- 
-    latent_semantics_folder = 'latent_semantic_files/'
-    filepath = f'{latent_semantics_folder}r{fileName}'
-
-    #get given latent semantic file name
-    semantic_data = readFromFile(filepath)
-
-    #split latent semantic file based on name to get information about file
-    latentSemanticsName = fileName.split("_")
-    dimesionalityReductionTechnique = latentSemanticsName[2]
-    featureType = latentSemanticsName[3]
-
-    #get the features of given image based on the latent semantic file
-    new_image = getImageFeature(featureType, new_image)
-    if x_or_y == 0:
-        typeFeatures = get_Features_based_on_Type_or_Subject(featureType, 0)
-
-    elif x_or_y == 1:
-        typeFeatures = get_Features_based_on_Type_or_Subject(featureType, 1)
-
-
-
-    baseSimilarity = np.dot([new_image],np.transpose(semantic_data))
-
-    dataBaseSimilarities = get_Type_Latent_Semantic_Similarity(typeFeatures, baseSimilarity,featureType, semantic_data)
-
-    # sort similarites 
-    dataBaseSimilarities.sort(key = lambda x: x[1], reverse=False)
-
-    outputNames = []
-    for inc in range(len(dataBaseSimilarities)):
-        if x_or_y == 0:
-            outputNames.append(types[dataBaseSimilarities[inc][0]])
-        elif x_or_y == 1:
-            outputNames.append(subjects[dataBaseSimilarities[inc][0]])
-
-    print(outputNames)
-
-
-
-
+    return k_highest_values, k_highest_vectors

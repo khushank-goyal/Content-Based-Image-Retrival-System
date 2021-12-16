@@ -1,0 +1,87 @@
+CSE 515 Project Phase II
+
+GROUP 11 Team Members 
+•	Tanner Greenhagen
+•	Khushank Sanjay Goyal
+•	Connor Wardell
+•	Mounish Rayudu Chennupati
+•	Varad Vilas Joshi
+
+Abstract:
+
+High dimensions of data is a challenge to media in a dynamic world. It increases the storage, computation and cost of indexing. Reducing the dimensions of data is vital for effective and efficient search and analysis. Graphs are more rich and expressive forms of data representation. They represent pairwise relationship between the features of given object. In this phase we will experiment with dimensionality techniques like PCA, SVD and report the top k latent semantics. Additionally, we create similarity graphs based on the relational properties and return similar subjects using ASCOS++ measure.
+Keywords — dimensionality reduction, principal component analysis, singular value decomposition, graphs, ASCOSS++.
+
+INTRODUCTION:
+
+Terminology
+
+HOG: Histogram of Oriented Gradients.
+
+CM: Color Moments.
+
+LBP: Locally Binary Patterns.
+
+PCA: Principal Component Analysis. It is the dimensionality reduction technique where the covariance matrix is factorised. Covariance matrix is square symmetric and undergoes eigen decomposition. Post decomposition it results into C=USV T where U is the left eigen vectors of the covariance matrix. V is the right factored eigen vectors of the covariance matrix. S is the core diagonal matrix which consists of the values of square roots of eigen values in descending order. After decomposition and selecting the top k features, variance remains preserved.
+
+SVD: Singular Value Decomposition. It is the factorization of the data matrix. This data matrix undergoes the eigen decomposition. After decomposition it results into D=USV t where U (object-object matrix) is the left eigen vectors of the DDT matrix. V(feature-feature) is the right factored matrix of the eigen vectors of DTD matrix. S is the core diagonal matrix which consists of the values of square roots of eigen values. After decomposition and selecting the top k features, data matrix remains preserved.
+
+ASCOS++:
+
+Goal Description
+
+The goal of this project is to implement programs which illustrate the knowledge and understanding of dimensionality reduction and latent semantics on a given data set. Furthermore, we also create graphs for analysis and similarity search. Using the inputs given, the deliverable will carry out decompositions of data and provide the latent semantics. Also, it will help in graphical analysis. This is achieved by the following tasks.
+
+	For task 1 we have to implement a program that will perform user selected dimensionality reduction techniques on one of the three feature models and reports the top k latent semantics extracted.
+
+	For task 3
+
+	For task 4
+
+	For task 5
+
+	For task 6
+
+	For task 7
+
+	For task 8
+
+	For task 9
+
+Assumptions
+
+DESCRIPTION
+
+In this phase of the project, we have separated each 
+
+INTERFACE DESCRIPTION
+
+Task 1
+
+Task 2
+
+Task 3
+
+Task 4
+
+Task 5
+
+Task 6
+
+Task 7
+
+Task 8
+
+Task 9
+
+SYSTEM AND INSTALLATION REQUIREMENTS
+
+RELATED WORK
+
+CONCLUSIONS
+
+BIBLIOGRAPHY
+
+APPENDIX
+
+
